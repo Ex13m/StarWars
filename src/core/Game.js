@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 import { setupScene } from '../world/SceneSetup.js';
 import { Starfield } from '../world/Starfield.js';
+import { Nebula } from '../world/Nebula.js';
 import { SpeedField } from '../world/SpeedField.js';
 import { Postprocessing } from '../world/Postprocessing.js';
 import { Input } from './Input.js';
@@ -41,8 +42,21 @@ export class Game {
     this.scene = new THREE.Scene();
     setupScene(this.scene);
     this.starfield = new Starfield(this.scene);
+    this.nebula = new Nebula(this.scene);
     this.speedField = new SpeedField(this.scene);
     this.post = new Postprocessing(this.renderer, this.scene, this.camera);
+
+    // Muzzle flash: a small additive quad parked in front of the camera on each shot.
+    const mMat = new THREE.MeshBasicMaterial({
+      color: 0x9ffcff, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+    });
+    this.muzzle = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.6), mMat);
+    this.muzzle.visible = false;
+    this.muzzle.frustumCulled = false;
+    this.scene.add(this.muzzle);
+    this.muzzleTimer = 0;
+    this._fwdScratch = new THREE.Vector3();
 
     this.input = new Input(this.renderer.domElement);
     this.arCamera = new ARCamera();
@@ -123,6 +137,7 @@ export class Game {
   _nextWave() {
     this.wave += 1;
     this.spawner.startWave(this.wave);
+    this.hud.flashWarp(); // warp-jump flash on each new wave
     if (this.spawner.isBossWave(this.wave)) {
       this.hud.showBanner('⚠ ХОР ПРИБЛИЖАЕТСЯ');
       this.audio.setMusic('boss');
@@ -268,8 +283,21 @@ export class Game {
       this.camera.position.set(0, 0, 0);
     }
 
+    // Muzzle flash tracks the view and fades fast.
+    if (this.muzzleTimer > 0) {
+      this.muzzleTimer -= dt;
+      this._fwdScratch.set(0, 0, -1).applyQuaternion(this.camera.quaternion);
+      this.muzzle.position.copy(this.camera.position).addScaledVector(this._fwdScratch, 5);
+      this.muzzle.quaternion.copy(this.camera.quaternion);
+      this.muzzle.material.opacity = Math.max(0, this.muzzleTimer / (CONFIG.weaponFeel.muzzleFlashMs / 1000)) * 0.9;
+      this.muzzle.visible = true;
+    } else if (this.muzzle.visible) {
+      this.muzzle.visible = false;
+    }
+
     // World + audio + HUD + render.
     this.starfield.update(dt);
+    this.nebula.update(dt);
     this.speedField.update(dt);
     if (this.audio) {
       this.audio.setEngine(t);
@@ -278,13 +306,23 @@ export class Game {
     if (this.state !== 'over') {
       this.hud.update(dt, {
         player: this.player, score: this.score, wave: this.wave,
-        camera: this.camera, enemies: this.spawner.enemies,
+        camera: this.camera, enemies: this.spawner.enemies, boss: this._findBoss(),
       });
     }
     this.post.render();
   }
 
-  addRecoil(amount = CONFIG.weaponFeel.recoilKick) { this.recoil += amount; }
+  addRecoil(amount = CONFIG.weaponFeel.recoilKick) {
+    this.recoil += amount;
+    // fire the muzzle flash on the same beat as the recoil kick
+    this.muzzleTimer = CONFIG.weaponFeel.muzzleFlashMs / 1000;
+    this.muzzle.rotation.z = Math.random() * Math.PI;
+  }
+
+  _findBoss() {
+    for (const e of this.spawner.enemies) if (e.active && e.type === 'boss') return e;
+    return null;
+  }
 
   stop() {
     this.running = false;

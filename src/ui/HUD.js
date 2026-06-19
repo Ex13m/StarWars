@@ -12,13 +12,18 @@ export class HUD {
     this.root.className = 'hud';
     this.root.innerHTML = `
       <div class="hud-damage" data-damage></div>
+      <div class="hud-warp" data-warp></div>
       <div class="hud-top">
         <div class="hud-score"><span class="hud-score__val" data-score>0</span>
           <span class="hud-mult" data-mult>×1</span></div>
         <div class="hud-wave" data-wave>ВОЛНА 1</div>
         <div class="hud-best">РЕКОРД <span data-best>0</span></div>
       </div>
-      <div class="hud-crosshair"><span></span><span></span><i></i></div>
+      <div class="hud-boss" data-boss-wrap hidden>
+        <label data-boss-name>ХОР</label>
+        <div class="hud-bossbar"><div class="hud-bossbar__fill" data-boss-fill></div></div>
+      </div>
+      <div class="hud-crosshair" data-crosshair><span></span><span></span><i></i></div>
       <div class="hud-banner" data-banner></div>
       <div class="hud-bottom">
         <div class="hud-bars">
@@ -42,9 +47,14 @@ export class HUD {
       hull: this.root.querySelector('[data-hull]'),
       banner: this.root.querySelector('[data-banner]'),
       damage: this.root.querySelector('[data-damage]'),
+      warp: this.root.querySelector('[data-warp]'),
       radar: this.root.querySelector('[data-radar]'),
       boost: this.root.querySelector('[data-boost]'),
       fire: this.root.querySelector('[data-fire]'),
+      crosshair: this.root.querySelector('[data-crosshair]'),
+      bossWrap: this.root.querySelector('[data-boss-wrap]'),
+      bossName: this.root.querySelector('[data-boss-name]'),
+      bossFill: this.root.querySelector('[data-boss-fill]'),
     };
     this.ctx = this.el.radar.getContext('2d');
 
@@ -76,8 +86,15 @@ export class HUD {
     this.el.damage.classList.add('is-flash');
   }
 
+  /** Quick white flash for warp jumps / wave transitions. */
+  flashWarp() {
+    this.el.warp.classList.remove('is-flash');
+    void this.el.warp.offsetWidth;
+    this.el.warp.classList.add('is-flash');
+  }
+
   update(dt, state) {
-    const { player, score, wave, camera, enemies } = state;
+    const { player, score, wave, camera, enemies, boss } = state;
 
     this.el.score.textContent = score.score.toLocaleString('ru-RU');
     this.el.mult.textContent = '×' + score.multiplier;
@@ -87,6 +104,17 @@ export class HUD {
 
     this.el.shield.style.width = (100 * player.shield / player.maxShield) + '%';
     this.el.hull.style.width = (100 * player.hull / player.maxHull) + '%';
+
+    // Critical state: pulse the cockpit red when the hull is low.
+    this.root.classList.toggle('is-critical', player.hull / player.maxHull <= 0.3);
+
+    // Boss health bar (shown only while a boss is alive).
+    if (boss && boss.active) {
+      this.el.bossWrap.hidden = false;
+      this.el.bossFill.style.width = (100 * Math.max(0, boss.hp) / boss.maxHp) + '%';
+    } else {
+      this.el.bossWrap.hidden = true;
+    }
 
     if (this._bannerTimer > 0) {
       this._bannerTimer -= dt;

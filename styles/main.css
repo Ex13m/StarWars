@@ -417,6 +417,45 @@ button { font-family: inherit; }
   100% { opacity: 0; box-shadow: inset 0 0 120px 10px rgba(255,40,70,0); }
 }
 
+/* Warp-jump flash (wave transitions) */
+.hud-warp {
+  position: absolute; inset: 0; opacity: 0; pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, rgba(220,245,255,0.95), rgba(120,210,255,0.35) 40%, transparent 70%);
+}
+.hud-warp.is-flash { animation: warp 0.5s ease-out; }
+@keyframes warp {
+  0% { opacity: 0.9; transform: scale(0.6); }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+
+/* Boss health bar */
+.hud-boss {
+  position: absolute; top: 54px; left: 50%; transform: translateX(-50%);
+  width: min(70%, 420px); text-align: center;
+}
+.hud-boss[hidden] { display: none; }
+.hud-boss label { font-size: 11px; letter-spacing: 0.3em; color: var(--amber); }
+.hud-bossbar {
+  margin-top: 4px; height: 8px; border-radius: 5px; overflow: hidden;
+  background: rgba(255,120,73,0.15); border: 1px solid rgba(255,120,73,0.5);
+}
+.hud-bossbar__fill {
+  height: 100%; width: 100%;
+  background: linear-gradient(90deg, #ff4d6d, #ff7849);
+  transition: width 0.15s linear;
+}
+
+/* Critical hull: steady red pulse around the screen edge. */
+.hud.is-critical::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  box-shadow: inset 0 0 100px 20px rgba(255,40,70,0.45);
+  animation: critical 1.1s ease-in-out infinite;
+}
+@keyframes critical {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.85; }
+}
+
 /* Touch buttons */
 .hud-btn {
   position: absolute; bottom: max(86px, calc(env(safe-area-inset-bottom) + 86px));

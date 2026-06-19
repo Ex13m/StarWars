@@ -243,6 +243,7 @@ python3 -m http.server 8080
 ## 8. Документы-спутники
 
 - [`docs/GDD.md`](./docs/GDD.md) — геймдизайн.
+- [`docs/LORE.md`](./docs/LORE.md) — **канон мира и конфликта** (сюжет, хронология, фракции).
 - [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — детальная архитектура.
 - [`docs/TECH_DESIGN.md`](./docs/TECH_DESIGN.md) — тех-решения, AR-пайплайн.
 - [`docs/ART_BIBLE.md`](./docs/ART_BIBLE.md) — визуальный стиль.

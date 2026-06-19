@@ -43,7 +43,7 @@ export const CONFIG = {
 
   // Look / aiming via the on-screen virtual joystick.
   input: {
-    turnRate: 1.7,           // rad/sec at full joystick deflection
+    turnRate: 2.9,           // rad/sec at full joystick deflection (snappy aiming)
     pitchClamp: 1.2,         // max up/down look (rad)
     autoFire: true,          // hold FIRE to keep shooting
   },
@@ -69,10 +69,10 @@ export const CONFIG = {
 
   // Gameplay constants used by combat/spawner/score (wired in the next slice).
   player: {
-    maxShield: 100,
+    maxShield: 120,
     maxHull: 100,
-    shieldRegenDelay: 3.0,   // sec without damage before shield regenerates
-    shieldRegenRate: 14,     // shield points/sec
+    shieldRegenDelay: 1.8,   // sec without damage before shield regenerates
+    shieldRegenRate: 26,     // shield points/sec (recovers faster between hits)
     fireCooldown: 0.14,      // sec between shots
     projectileSpeed: 320,
     projectileDamage: 25,
@@ -82,11 +82,11 @@ export const CONFIG = {
     hitRadius: 2.6,          // how close a bolt/enemy must get to hit the player
   },
 
-  // Subtle aim assist so touch aiming feels good without being an auto-aim.
+  // Aim assist so touch aiming feels good (generous, but not full auto-aim).
   aim: {
-    assistCone: 0.14,        // radians: only assists targets near the crosshair
-    assistStrength: 0.45,    // 0..1 nudge of the shot toward the locked target
-    range: 130,
+    assistCone: 0.22,        // radians: assists targets near the crosshair
+    assistStrength: 0.62,    // 0..1 nudge of the shot toward the locked target
+    range: 165,
   },
 
   weaponFeel: {
@@ -103,17 +103,17 @@ export const CONFIG = {
   },
 
   enemy: {
-    projectileSpeed: 130,
-    projectileDamage: 12,
-    contactDamage: 18,      // damage if an enemy collides with the player
+    projectileSpeed: 120,
+    projectileDamage: 8,
+    contactDamage: 12,      // damage if an enemy collides with the player
     despawnDistance: 140,   // recycle enemies that fly far past the player
   },
 
   difficulty: {
-    baseEnemiesPerWave: 4,
-    enemiesPerWaveGrowth: 2, // +N enemies each wave
+    baseEnemiesPerWave: 3,
+    enemiesPerWaveGrowth: 1, // +N enemies each wave
     bossEveryWaves: 4,
-    enemySpeedGrowth: 0.06,  // +6% enemy speed per wave
+    enemySpeedGrowth: 0.05,  // +5% enemy speed per wave
   },
 
   // Boss ("Choir") phases — escalate as its HP drops. Index by phase-1 (0,1,2).

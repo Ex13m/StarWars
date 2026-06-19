@@ -531,20 +531,35 @@ button { font-family: inherit; }
 }
 .hud-boost.is-on { opacity: 1; box-shadow: 0 0 14px rgba(255,179,71,0.8); }
 
-/* Target-lock markers (projected onto enemies) */
-.hud-markers { position: absolute; inset: 0; overflow: hidden; }
+/* Target markers: on-screen bracket OR off-screen edge arrow */
+.hud-markers { position: absolute; inset: 0; overflow: hidden; z-index: 5; }
 .hud-marker { position: absolute; top: 0; left: 0; }
+
+/* on-screen bracket (corner brackets, not a plain box) */
 .hud-marker__box {
-  position: absolute; width: 42px; height: 42px; transform: translate(-50%, -50%);
-  border: 2px solid rgba(255,77,109,0.85); border-radius: 6px;
-  box-shadow: 0 0 8px rgba(255,77,109,0.35);
+  position: absolute; width: 50px; height: 50px; transform: translate(-50%, -50%);
+  border: 2px solid rgba(255,77,109,0.95); border-radius: 4px;
+  box-shadow: 0 0 10px rgba(255,77,109,0.5), inset 0 0 6px rgba(255,77,109,0.25);
 }
 .hud-marker__label {
-  position: absolute; transform: translate(-50%, 26px);
-  font-size: 10px; letter-spacing: 0.06em; color: #ff9fb0; white-space: nowrap; text-align: center;
+  position: absolute; transform: translate(-50%, 30px);
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+  color: #ffb3c0; white-space: nowrap; text-align: center; text-shadow: 0 0 4px #000;
 }
-.hud-marker.is-boss .hud-marker__box { width: 72px; height: 72px; border-color: #ff7849; box-shadow: 0 0 14px rgba(255,120,73,0.6); }
-.hud-marker.is-lock .hud-marker__box { width: 52px; height: 52px; border-color: var(--amber); box-shadow: 0 0 16px rgba(255,179,71,0.8); animation: lockpulse 0.8s ease-in-out infinite; }
+/* off-screen arrow (triangle), rotated toward the threat */
+.hud-marker__arrow {
+  position: absolute; display: none; width: 0; height: 0;
+  border-left: 11px solid transparent; border-right: 11px solid transparent;
+  border-bottom: 20px solid #ff4d6d;
+  filter: drop-shadow(0 0 6px rgba(255,77,109,0.8));
+}
+.hud-marker.is-edge .hud-marker__box { display: none; }
+.hud-marker.is-edge .hud-marker__label { display: none; }
+.hud-marker.is-edge .hud-marker__arrow { display: block; }
+
+.hud-marker.is-boss .hud-marker__box { width: 84px; height: 84px; border-color: #ff7849; box-shadow: 0 0 16px rgba(255,120,73,0.7); }
+.hud-marker.is-boss .hud-marker__arrow { border-bottom-color: #ff7849; transform-origin: center; }
+.hud-marker.is-lock .hud-marker__box { width: 58px; height: 58px; border-color: var(--amber); box-shadow: 0 0 18px rgba(255,179,71,0.9); animation: lockpulse 0.8s ease-in-out infinite; }
 .hud-marker.is-lock .hud-marker__label { color: var(--amber); }
 .hud-crosshair.is-lock i { border-color: var(--amber); box-shadow: 0 0 12px rgba(255,179,71,0.9); }
 @keyframes lockpulse { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } }
@@ -556,18 +571,18 @@ button { font-family: inherit; }
 .joy {
   position: absolute; left: max(18px, env(safe-area-inset-left));
   bottom: max(26px, env(safe-area-inset-bottom));
-  width: 128px; height: 128px; touch-action: none;
+  width: 152px; height: 152px; touch-action: none;
 }
 .joy__ring {
   position: absolute; inset: 0; border-radius: 50%;
-  border: 2px solid rgba(65,211,255,0.4); background: rgba(18,28,52,0.35);
-  backdrop-filter: blur(4px);
+  border: 2px solid rgba(65,211,255,0.5); background: rgba(18,28,52,0.4);
+  backdrop-filter: blur(4px); box-shadow: 0 0 16px rgba(65,211,255,0.25) inset;
 }
 .joy__knob {
-  position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; border-radius: 50%;
+  position: absolute; left: 50%; top: 50%; width: 66px; height: 66px; border-radius: 50%;
   transform: translate(-50%, -50%);
-  background: radial-gradient(circle, rgba(160,235,255,0.95), rgba(65,211,255,0.5));
-  box-shadow: 0 0 18px rgba(65,211,255,0.7);
+  background: radial-gradient(circle, rgba(160,235,255,0.95), rgba(65,211,255,0.55));
+  box-shadow: 0 0 20px rgba(65,211,255,0.8);
 }
 
 .throttle {

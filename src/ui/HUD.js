@@ -66,15 +66,19 @@ export class HUD {
     };
     this.ctx = this.el.radar.getContext('2d');
 
-    // Pool of reusable target-marker elements.
+    // Pool of reusable target-marker elements (on-screen bracket OR edge arrow).
     this.markerPool = [];
     for (let i = 0; i < MARKERS; i++) {
       const m = document.createElement('div');
       m.className = 'hud-marker';
-      m.innerHTML = `<div class="hud-marker__box"></div><div class="hud-marker__label"></div>`;
+      m.innerHTML = `<div class="hud-marker__box"></div><div class="hud-marker__arrow"></div><div class="hud-marker__label"></div>`;
       m.style.display = 'none';
       this.el.markers.appendChild(m);
-      this.markerPool.push({ el: m, label: m.querySelector('.hud-marker__label') });
+      this.markerPool.push({
+        el: m,
+        arrow: m.querySelector('.hud-marker__arrow'),
+        label: m.querySelector('.hud-marker__label'),
+      });
     }
 
     this._invQ = new THREE.Quaternion();
@@ -133,39 +137,53 @@ export class HUD {
     this._drawRadar(camera, enemies);
   }
 
-  // Project enemies to screen space and place target brackets; flag the one
-  // nearest the crosshair as the locked target.
+  // Project every enemy: on-screen ones get a target bracket, off-screen/behind
+  // ones get an edge ARROW pointing where to turn. The on-screen enemy nearest
+  // the crosshair is flagged as the lock.
   _updateMarkers(camera, enemies) {
     const w = window.innerWidth, h = window.innerHeight;
     const cx = w / 2, cy = h / 2;
+    const margin = 46;
     let lockIdx = -1, lockBest = LOCK_RADIUS;
 
-    // first pass: find the lock target
-    const screen = [];
-    let slot = 0;
+    const data = [];
     for (const e of enemies) {
-      if (!e.active || slot >= MARKERS) continue;
+      if (!e.active || data.length >= MARKERS) continue;
       this._v.copy(e.position).project(camera);
-      if (this._v.z > 1) continue; // behind camera
-      const x = (this._v.x * 0.5 + 0.5) * w;
-      const y = (-this._v.y * 0.5 + 0.5) * h;
-      if (x < -60 || x > w + 60 || y < -60 || y > h + 60) continue;
+      let nx = this._v.x, ny = this._v.y;
+      const behind = this._v.z > 1;
+      if (behind) { nx = -nx; ny = -ny; } // flip so the arrow points the right way
       const dist = Math.round(e.position.distanceTo(camera.position));
-      const d2c = Math.hypot(x - cx, y - cy);
-      if (d2c < lockBest) { lockBest = d2c; lockIdx = slot; }
-      screen.push({ x, y, dist, boss: e.type === 'boss' });
-      slot++;
+      const boss = e.type === 'boss';
+      const idx = data.length;
+
+      if (!behind && Math.abs(nx) <= 1 && Math.abs(ny) <= 1) {
+        const x = (nx * 0.5 + 0.5) * w;
+        const y = (-ny * 0.5 + 0.5) * h;
+        if (Math.hypot(x - cx, y - cy) < lockBest) { lockBest = Math.hypot(x - cx, y - cy); lockIdx = idx; }
+        data.push({ edge: false, x, y, dist, boss });
+      } else {
+        // clamp the direction onto a screen-edge box → arrow position + heading
+        let ax = nx, ay = ny;
+        const m = Math.max(Math.abs(ax), Math.abs(ay)) || 1;
+        ax /= m; ay /= m;
+        const x = (ax * 0.5 + 0.5) * (w - 2 * margin) + margin;
+        const y = (-ay * 0.5 + 0.5) * (h - 2 * margin) + margin;
+        data.push({ edge: true, x, y, dist, boss, angle: Math.atan2(ax, ay) });
+      }
     }
 
     for (let i = 0; i < MARKERS; i++) {
       const m = this.markerPool[i];
-      const s = screen[i];
+      const s = data[i];
       if (!s) { m.el.style.display = 'none'; continue; }
       m.el.style.display = '';
       m.el.style.transform = `translate(${s.x}px, ${s.y}px)`;
-      m.el.classList.toggle('is-lock', i === lockIdx);
+      m.el.classList.toggle('is-edge', s.edge);
       m.el.classList.toggle('is-boss', s.boss);
-      m.label.textContent = (i === lockIdx ? 'ЦЕЛЬ · ' : '') + s.dist + 'м';
+      m.el.classList.toggle('is-lock', !s.edge && i === lockIdx);
+      if (s.edge) m.arrow.style.transform = `translate(-50%, -50%) rotate(${s.angle}rad)`;
+      m.label.textContent = (!s.edge && i === lockIdx ? 'ЦЕЛЬ · ' : '') + s.dist + 'м';
     }
 
     this.el.crosshair.classList.toggle('is-lock', lockIdx >= 0);

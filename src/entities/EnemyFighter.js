@@ -6,10 +6,10 @@ import { CONFIG } from '../config.js';
 
 // Per-type tuning. radius is used for hit detection. (Boss = the "Choir" node.)
 export const ENEMY_TYPES = {
-  scout:       { hp: 30,  radius: 1.6, scale: 0.9, speed: 26, fireRate: 0,    points: 100,  color: 0x6fe0ff },
-  interceptor: { hp: 55,  radius: 1.8, scale: 1.1, speed: 20, fireRate: 2.2,  points: 250,  color: 0xff4d6d },
-  bomber:      { hp: 110, radius: 2.6, scale: 1.7, speed: 12, fireRate: 3.4,  points: 400,  color: 0xc77dff },
-  boss:        { hp: 1400, radius: 6.0, scale: 4.2, speed: 7,  fireRate: 1.1,  points: 5000, color: 0xff7849 },
+  scout:       { hp: 30,  radius: 1.6, scale: 0.9, speed: 20, fireRate: 0,    points: 100,  color: 0x6fe0ff },
+  interceptor: { hp: 55,  radius: 1.8, scale: 1.1, speed: 17, fireRate: 1.2,  points: 250,  color: 0xff4d6d },
+  bomber:      { hp: 110, radius: 2.6, scale: 1.7, speed: 11, fireRate: 1.5,  points: 400,  color: 0xc77dff },
+  boss:        { hp: 1400, radius: 6.0, scale: 4.2, speed: 7,  fireRate: 0.85, points: 5000, color: 0xff7849 },
 };
 
 export class EnemyFighter {

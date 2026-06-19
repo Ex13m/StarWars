@@ -5,6 +5,28 @@
 
 import { GAME_VERSION } from './version.js';
 import { WhatsNew } from './ui/WhatsNew.js';
+import { AudioEngine } from './audio/AudioEngine.js';
+
+let game = null;
+
+async function engage() {
+  const briefing = document.getElementById('briefing');
+  const gameRoot = document.getElementById('game-root');
+
+  // Audio must start from this user gesture (autoplay policy).
+  const audio = new AudioEngine();
+  audio.preload();
+  audio.unlock();
+  audio.setMusic('combat');
+
+  if (briefing) briefing.style.display = 'none';
+  if (gameRoot) gameRoot.hidden = false;
+
+  // Defer-load the WebGL slice so the briefing stays light until "В БОЙ".
+  const { Game } = await import('./core/Game.js');
+  game = new Game(gameRoot, audio);
+  await game.start();
+}
 
 function boot() {
   // Stamp the build version into the briefing footer.
@@ -24,12 +46,17 @@ function boot() {
     notesBtn.addEventListener('click', () => whatsNew.show({ force: true }));
   }
 
-  // ENGAGE — entry into the battle. Gameplay slice not wired yet.
-  const engage = document.querySelector('[data-action="engage"]');
-  if (engage) {
-    engage.addEventListener('click', () => {
-      // TODO: import('./core/Game.js') and start the run once the slice is built.
-      console.info('[STARWARS] ENGAGE — gameplay slice not wired yet.');
+  // ENGAGE — enter the battle (starts the flight-feel slice).
+  const engageBtn = document.querySelector('[data-action="engage"]');
+  if (engageBtn) {
+    engageBtn.addEventListener('click', () => {
+      engageBtn.disabled = true;
+      engage().catch((err) => {
+        console.error('[STARWARS] failed to start:', err);
+        const briefing = document.getElementById('briefing');
+        if (briefing) briefing.style.display = '';
+        engageBtn.disabled = false;
+      });
     });
   }
 }

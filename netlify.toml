@@ -1,0 +1,28 @@
+# Netlify configuration for STARWARS — AR Space Fighter
+# Static site: no build step required (vanilla ES modules + CDN-hosted Three.js).
+
+[build]
+  publish = "."
+  command = ""
+
+# AR features (camera + DeviceOrientation) REQUIRE a secure context (HTTPS).
+# Netlify serves HTTPS by default, so AR works out of the box on deploy.
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Allow the page to request camera + motion/orientation sensors.
+    Permissions-Policy = "camera=(self), gyroscope=(self), accelerometer=(self), magnetometer=(self)"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Long-cache immutable static assets, but always revalidate the entry HTML.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/src/*"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"

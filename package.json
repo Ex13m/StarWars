@@ -1,0 +1,31 @@
+{
+  "name": "starwars-ar-fighter",
+  "version": "0.1.0",
+  "description": "STARWARS — AAA-class AR space fighter game. Pilot a starfighter in a large-scale space battle against aliens, rendered in augmented reality through your phone's camera. Built with WebXR + Three.js.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "npx serve . -l 8080",
+    "start": "npx serve . -l 8080",
+    "check": "node tools/check-syntax.mjs",
+    "format": "echo 'Add prettier here if desired'"
+  },
+  "keywords": [
+    "ar",
+    "webxr",
+    "three.js",
+    "space",
+    "game",
+    "starfighter",
+    "shooter",
+    "webgl"
+  ],
+  "author": "STARWARS Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "serve": "^14.2.1"
+  }
+}

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#05070f" />
+  <title>STARWARS — AR Space Fighter</title>
+  <meta name="description" content="Пилотируй истребитель в гуще космического сражения с Роем Сайленов — в дополненной реальности на твоём телефоне." />
+  <link rel="stylesheet" href="./styles/main.css" />
+
+  <!-- Import map: zero-build ES modules. Three.js + addons load from CDN in the
+       PLAYER's browser (not the build container), so this is offline-safe for
+       our tooling. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <!-- Howler.js (audio engine) is vendored locally as a UMD global (window.Howl /
+       window.Howler). Loaded as a classic script so the global exists before our
+       module runs. MIT license — see vendor/. -->
+  <script src="./vendor/howler.min.js"></script>
+</head>
+<body>
+  <!-- Animated starfield backdrop (pure CSS until the WebGL scene mounts). -->
+  <div class="space-backdrop" aria-hidden="true">
+    <div class="stars stars--far"></div>
+    <div class="stars stars--mid"></div>
+    <div class="stars stars--near"></div>
+    <div class="nebula-glow"></div>
+  </div>
+
+  <!-- BRIEFING SCREEN -->
+  <main class="briefing" id="briefing">
+    <div class="briefing__inner">
+      <p class="briefing__eyebrow">ПОЯС ХЕЛИОС · СТАНЦИЯ «ТЕРМИНУС» · 2387</p>
+      <h1 class="briefing__title">STAR<span>WARS</span></h1>
+      <p class="briefing__subtitle">AR SPACE FIGHTER</p>
+
+      <div class="briefing__brief">
+        <p>
+          Разлом вскрылся над станцией. Колониальный Флот пал за минуты.
+          Между Роем Сайленов и эвакуацией — только ты.
+        </p>
+        <p class="briefing__order">«Держи небо. Каждая минута — спасённый транспорт.»</p>
+      </div>
+
+      <div class="briefing__actions">
+        <button class="btn btn--engage" type="button" data-action="engage">
+          <span class="btn__label">В БОЙ</span>
+          <span class="btn__hint">ENGAGE</span>
+        </button>
+        <button class="btn btn--ghost" type="button" data-action="patch-notes">
+          Что нового
+        </button>
+      </div>
+
+      <footer class="briefing__foot">
+        <span data-version>v0.0.0</span>
+        <span class="dot">·</span>
+        <span>Эскадрилья «Вэнгард»</span>
+      </footer>
+    </div>
+  </main>
+
+  <!-- Game canvas + HUD mount here later (core/Game.js). -->
+  <div id="game-root" class="game-root" hidden></div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

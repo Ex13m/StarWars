@@ -25,25 +25,12 @@ export class CombatSystem {
     this._muzzle = new THREE.Vector3();
   }
 
-  /** Fire the player's twin blasters along the crosshair, with light aim assist. */
-  playerFire(camera, enemies) {
-    if (!this.player.canFire()) return;
-    this.player.onFire();
-
-    this._fwd.set(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
-    this._applyAimAssist(camera, enemies);
-
-    // Muzzle just ahead of the cockpit so the tracer reads as leaving the ship.
-    this._muzzle.copy(camera.position).addScaledVector(this._fwd, 3);
-
-    const p = CONFIG.player;
-    this.projectiles.spawn(this._muzzle, this._fwd, p.projectileSpeed, 'player', p.projectileDamage);
-    this.audio.play('laserPlayer', { pos: this._muzzle });
-    vibrate(CONFIG.weaponFeel.haptics.fire);
-    if (this.hooks.onRecoil) this.hooks.onRecoil();
-  }
-
-  _applyAimAssist(camera, enemies) {
+  /**
+   * Write the firing direction (crosshair forward + light aim assist) into `out`.
+   * Caller owns the spawn so it can fire from the visible gun barrels.
+   */
+  aimDir(out, camera, enemies) {
+    out.set(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
     const a = CONFIG.aim;
     let best = null;
     let bestDot = Math.cos(a.assistCone);
@@ -53,13 +40,20 @@ export class CombatSystem {
       const dist = this._toE.length();
       if (dist > a.range || dist < 0.001) continue;
       this._toE.multiplyScalar(1 / dist);
-      const dot = this._toE.dot(this._fwd);
+      const dot = this._toE.dot(out);
       if (dot > bestDot) { bestDot = dot; best = e; }
     }
     if (best) {
       this._dir.copy(best.position).sub(camera.position).normalize();
-      this._fwd.lerp(this._dir, a.assistStrength).normalize();
+      out.lerp(this._dir, a.assistStrength).normalize();
     }
+    return out;
+  }
+
+  /** Spawn one player bolt from a world-space barrel tip. */
+  spawnPlayerBolt(origin, dir) {
+    const p = CONFIG.player;
+    this.projectiles.spawn(origin, dir, p.projectileSpeed, 'player', p.projectileDamage);
   }
 
   /** Enemy fires a bolt straight at the player (origin). Called by EnemyAI. */

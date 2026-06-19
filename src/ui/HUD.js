@@ -1,21 +1,24 @@
-// HUD — the cockpit overlay: crosshair, shield/hull bars, score + combo, wave
-// indicator, a 360° threat radar, and touch FIRE/BOOST buttons. Pure DOM/canvas,
-// updated each frame from game state. Styles live in styles/main.css (.hud-*).
+// HUD — combat overlay: crosshair, target-lock markers, speed/boost readout,
+// shield/hull bars, score + combo, wave + boss bars, 360° threat radar, banners,
+// damage/warp flashes and a low-hull alarm. Steering/throttle/fire live in
+// ui/Controls.js. Pure DOM/canvas, refreshed each frame from game state.
 import * as THREE from 'three';
 
 const RADAR_SIZE = 132;
-const RADAR_RANGE = 130; // world units mapped to the radar edge
+const RADAR_RANGE = 130;
+const MARKERS = 16;
+const LOCK_RADIUS = 80; // px from screen center to count as the locked target
 
 export class HUD {
-  constructor({ onBoost, onFireDown, onFireUp } = {}) {
+  constructor() {
     this.root = document.createElement('div');
     this.root.className = 'hud';
     this.root.innerHTML = `
       <div class="hud-damage" data-damage></div>
       <div class="hud-warp" data-warp></div>
+      <div class="hud-markers" data-markers></div>
       <div class="hud-top">
-        <div class="hud-score"><span class="hud-score__val" data-score>0</span>
-          <span class="hud-mult" data-mult>×1</span></div>
+        <div class="hud-score"><span data-score>0</span><span class="hud-mult" data-mult>×1</span></div>
         <div class="hud-wave" data-wave>ВОЛНА 1</div>
         <div class="hud-best">РЕКОРД <span data-best>0</span></div>
       </div>
@@ -25,6 +28,10 @@ export class HUD {
       </div>
       <div class="hud-crosshair" data-crosshair><span></span><span></span><i></i></div>
       <div class="hud-banner" data-banner></div>
+      <div class="hud-speed">
+        <span class="hud-speed__val" data-speed>0</span><span class="hud-speed__unit">М/С</span>
+        <span class="hud-boost" data-boostbadge>БУСТ</span>
+      </div>
       <div class="hud-bottom">
         <div class="hud-bars">
           <div class="hud-bar hud-bar--shield"><label>ЩИТ</label>
@@ -34,36 +41,38 @@ export class HUD {
         </div>
         <canvas class="hud-radar" width="${RADAR_SIZE}" height="${RADAR_SIZE}" data-radar></canvas>
       </div>
-      <button class="hud-btn hud-btn--boost" data-boost>BOOST</button>
-      <button class="hud-btn hud-btn--fire" data-fire>FIRE</button>
     `;
 
     this.el = {
-      score: this.root.querySelector('[data-score]'),
-      mult: this.root.querySelector('[data-mult]'),
-      wave: this.root.querySelector('[data-wave]'),
-      best: this.root.querySelector('[data-best]'),
-      shield: this.root.querySelector('[data-shield]'),
-      hull: this.root.querySelector('[data-hull]'),
-      banner: this.root.querySelector('[data-banner]'),
-      damage: this.root.querySelector('[data-damage]'),
-      warp: this.root.querySelector('[data-warp]'),
-      radar: this.root.querySelector('[data-radar]'),
-      boost: this.root.querySelector('[data-boost]'),
-      fire: this.root.querySelector('[data-fire]'),
-      crosshair: this.root.querySelector('[data-crosshair]'),
-      bossWrap: this.root.querySelector('[data-boss-wrap]'),
-      bossName: this.root.querySelector('[data-boss-name]'),
-      bossFill: this.root.querySelector('[data-boss-fill]'),
+      score: q(this.root, '[data-score]'),
+      mult: q(this.root, '[data-mult]'),
+      wave: q(this.root, '[data-wave]'),
+      best: q(this.root, '[data-best]'),
+      shield: q(this.root, '[data-shield]'),
+      hull: q(this.root, '[data-hull]'),
+      banner: q(this.root, '[data-banner]'),
+      damage: q(this.root, '[data-damage]'),
+      warp: q(this.root, '[data-warp]'),
+      radar: q(this.root, '[data-radar]'),
+      crosshair: q(this.root, '[data-crosshair]'),
+      bossWrap: q(this.root, '[data-boss-wrap]'),
+      bossFill: q(this.root, '[data-boss-fill]'),
+      speed: q(this.root, '[data-speed]'),
+      boostBadge: q(this.root, '[data-boostbadge]'),
+      markers: q(this.root, '[data-markers]'),
     };
     this.ctx = this.el.radar.getContext('2d');
 
-    // Buttons stop propagation so they don't also trigger tap-to-fire on the canvas.
-    const stop = (e) => e.stopPropagation();
-    this.el.boost.addEventListener('pointerdown', (e) => { stop(e); onBoost && onBoost(); });
-    this.el.fire.addEventListener('pointerdown', (e) => { stop(e); onFireDown && onFireDown(); });
-    this.el.fire.addEventListener('pointerup', (e) => { stop(e); onFireUp && onFireUp(); });
-    this.el.fire.addEventListener('pointerleave', () => onFireUp && onFireUp());
+    // Pool of reusable target-marker elements.
+    this.markerPool = [];
+    for (let i = 0; i < MARKERS; i++) {
+      const m = document.createElement('div');
+      m.className = 'hud-marker';
+      m.innerHTML = `<div class="hud-marker__box"></div><div class="hud-marker__label"></div>`;
+      m.style.display = 'none';
+      this.el.markers.appendChild(m);
+      this.markerPool.push({ el: m, label: m.querySelector('.hud-marker__label') });
+    }
 
     this._invQ = new THREE.Quaternion();
     this._v = new THREE.Vector3();
@@ -79,22 +88,11 @@ export class HUD {
     this._bannerTimer = seconds;
   }
 
-  flashDamage() {
-    this.el.damage.classList.remove('is-flash');
-    // force reflow so the animation can retrigger
-    void this.el.damage.offsetWidth;
-    this.el.damage.classList.add('is-flash');
-  }
-
-  /** Quick white flash for warp jumps / wave transitions. */
-  flashWarp() {
-    this.el.warp.classList.remove('is-flash');
-    void this.el.warp.offsetWidth;
-    this.el.warp.classList.add('is-flash');
-  }
+  flashDamage() { retrigger(this.el.damage, 'is-flash'); }
+  flashWarp() { retrigger(this.el.warp, 'is-flash'); }
 
   update(dt, state) {
-    const { player, score, wave, camera, enemies, boss } = state;
+    const { player, score, wave, camera, enemies, boss, speed, throttleT } = state;
 
     this.el.score.textContent = score.score.toLocaleString('ru-RU');
     this.el.mult.textContent = '×' + score.multiplier;
@@ -104,11 +102,11 @@ export class HUD {
 
     this.el.shield.style.width = (100 * player.shield / player.maxShield) + '%';
     this.el.hull.style.width = (100 * player.hull / player.maxHull) + '%';
-
-    // Critical state: pulse the cockpit red when the hull is low.
     this.root.classList.toggle('is-critical', player.hull / player.maxHull <= 0.3);
 
-    // Boss health bar (shown only while a boss is alive).
+    this.el.speed.textContent = Math.round(speed);
+    this.el.boostBadge.classList.toggle('is-on', throttleT > 0.8);
+
     if (boss && boss.active) {
       this.el.bossWrap.hidden = false;
       this.el.bossFill.style.width = (100 * Math.max(0, boss.hp) / boss.maxHp) + '%';
@@ -121,33 +119,68 @@ export class HUD {
       if (this._bannerTimer <= 0) this.el.banner.classList.remove('is-show');
     }
 
+    this._updateMarkers(camera, enemies);
     this._drawRadar(camera, enemies);
+  }
+
+  // Project enemies to screen space and place target brackets; flag the one
+  // nearest the crosshair as the locked target.
+  _updateMarkers(camera, enemies) {
+    const w = window.innerWidth, h = window.innerHeight;
+    const cx = w / 2, cy = h / 2;
+    let lockIdx = -1, lockBest = LOCK_RADIUS;
+
+    // first pass: find the lock target
+    const screen = [];
+    let slot = 0;
+    for (const e of enemies) {
+      if (!e.active || slot >= MARKERS) continue;
+      this._v.copy(e.position).project(camera);
+      if (this._v.z > 1) continue; // behind camera
+      const x = (this._v.x * 0.5 + 0.5) * w;
+      const y = (-this._v.y * 0.5 + 0.5) * h;
+      if (x < -60 || x > w + 60 || y < -60 || y > h + 60) continue;
+      const dist = Math.round(e.position.distanceTo(camera.position));
+      const d2c = Math.hypot(x - cx, y - cy);
+      if (d2c < lockBest) { lockBest = d2c; lockIdx = slot; }
+      screen.push({ x, y, dist, boss: e.type === 'boss' });
+      slot++;
+    }
+
+    for (let i = 0; i < MARKERS; i++) {
+      const m = this.markerPool[i];
+      const s = screen[i];
+      if (!s) { m.el.style.display = 'none'; continue; }
+      m.el.style.display = '';
+      m.el.style.transform = `translate(${s.x}px, ${s.y}px)`;
+      m.el.classList.toggle('is-lock', i === lockIdx);
+      m.el.classList.toggle('is-boss', s.boss);
+      m.label.textContent = (i === lockIdx ? 'ЦЕЛЬ · ' : '') + s.dist + 'м';
+    }
+
+    this.el.crosshair.classList.toggle('is-lock', lockIdx >= 0);
   }
 
   _drawRadar(camera, enemies) {
     const ctx = this.ctx;
     const c = RADAR_SIZE / 2;
     ctx.clearRect(0, 0, RADAR_SIZE, RADAR_SIZE);
-
-    // backdrop + rings
     ctx.fillStyle = 'rgba(8,14,28,0.55)';
     ctx.beginPath(); ctx.arc(c, c, c - 1, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = 'rgba(65,211,255,0.35)';
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(c, c, c - 2, 0, Math.PI * 2); ctx.stroke();
     ctx.beginPath(); ctx.arc(c, c, (c - 2) * 0.5, 0, Math.PI * 2); ctx.stroke();
-    // player marker (center, pointing up = forward)
     ctx.fillStyle = '#41d3ff';
     ctx.beginPath(); ctx.moveTo(c, c - 5); ctx.lineTo(c - 4, c + 4); ctx.lineTo(c + 4, c + 4); ctx.closePath(); ctx.fill();
 
     this._invQ.copy(camera.quaternion).invert();
     for (const e of enemies) {
       if (!e.active) continue;
-      // enemy position relative to the player, rotated into camera space
       this._v.copy(e.position).sub(camera.position).applyQuaternion(this._invQ);
       const dist = Math.hypot(this._v.x, this._v.z);
       const k = Math.min(1, dist / RADAR_RANGE) * (c - 4);
-      const ang = Math.atan2(this._v.x, -this._v.z); // forward = up
+      const ang = Math.atan2(this._v.x, -this._v.z);
       const px = c + Math.sin(ang) * k;
       const py = c - Math.cos(ang) * k;
       const behind = this._v.z > 0;
@@ -157,4 +190,11 @@ export class HUD {
       ctx.fill();
     }
   }
+}
+
+function q(root, sel) { return root.querySelector(sel); }
+function retrigger(el, cls) {
+  el.classList.remove(cls);
+  void el.offsetWidth; // force reflow so the animation restarts
+  el.classList.add(cls);
 }

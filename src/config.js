@@ -41,12 +41,20 @@ export const CONFIG = {
     color: 0xcfe6ff,
   },
 
-  // Look / aiming. In AR the device gyro drives this; drag is the desktop fallback.
+  // Look / aiming via the on-screen virtual joystick.
   input: {
-    dragSensitivity: 0.0035, // rad per pixel when dragging (no-gyro fallback)
+    turnRate: 1.7,           // rad/sec at full joystick deflection
     pitchClamp: 1.2,         // max up/down look (rad)
-    smoothing: 12,           // higher = snappier look
-    autoFire: true,          // hold to keep firing
+    autoFire: true,          // hold FIRE to keep shooting
+  },
+
+  // Large-scale battle backdrop you fly through (capital ships, distant dogfights).
+  armada: {
+    capitalShips: 7,         // huge ships drifting in the corridor
+    fighterSwarm: 260,       // distant dogfighting specks
+    swarmRadius: 320,
+    corridorDepth: 1100,
+    flakInterval: 0.6,       // avg seconds between distant explosions
   },
 
   audio: {

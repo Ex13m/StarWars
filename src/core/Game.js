@@ -1,7 +1,9 @@
-// Game — orchestrator and main loop. Owns the renderer, camera, world layers and
-// the per-frame update order. This slice delivers the FLIGHT FEEL: rushing warp
-// streaks, banking, FOV "punch" on boost, engine audio and camera shake. Combat
-// entities/systems plug into update() in the next slice.
+// Game — orchestrator and main loop. Owns the renderer, camera, world layers,
+// combat systems and UI, and defines the per-frame update order.
+//
+// Flight feel: rushing warp streaks, banking, FOV punch + micro-shake on boost,
+// engine audio. Combat: wave spawning, enemy AI, weapons with recoil/haptics,
+// pooled explosions, score/combo, HUD radar, and end screens.
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 import { setupScene } from '../world/SceneSetup.js';
@@ -10,16 +12,24 @@ import { SpeedField } from '../world/SpeedField.js';
 import { Postprocessing } from '../world/Postprocessing.js';
 import { Input } from './Input.js';
 import { ARCamera } from '../ar/ARCamera.js';
+import { Player } from '../entities/Player.js';
+import { Spawner } from '../systems/Spawner.js';
+import { CombatSystem } from '../systems/CombatSystem.js';
+import { ScoreSystem } from '../systems/ScoreSystem.js';
+import { updateEnemyAI } from '../systems/EnemyAI.js';
+import { HUD } from '../ui/HUD.js';
+import { Screens } from '../ui/Screens.js';
 
 export class Game {
   constructor(root, audio) {
     this.root = root;
     this.audio = audio;
     this.running = false;
+    this.state = 'idle'; // 'playing' | 'over'
 
-    // Renderer — alpha:true so the AR camera video shows through empty space.
+    // --- renderer (alpha for AR compositing) ---
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    this.renderer.setClearColor(0x000000, 0); // transparent
+    this.renderer.setClearColor(0x000000, 0);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, CONFIG.render.pixelRatioCap));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     Object.assign(this.renderer.domElement.style, { position: 'fixed', inset: '0' });
@@ -37,13 +47,48 @@ export class Game {
     this.input = new Input(this.renderer.domElement);
     this.arCamera = new ARCamera();
 
-    // Flight state.
+    // --- gameplay ---
+    this.player = new Player();
+    this.score = new ScoreSystem();
+    this.spawner = new Spawner(this.scene);
+    this.combat = new CombatSystem(this.scene, {
+      player: this.player,
+      score: this.score,
+      audio: this.audio,
+      hooks: {
+        onRecoil: () => this.addRecoil(),
+        onPlayerHit: () => this._onPlayerHit(),
+      },
+    });
+
+    this.hud = new HUD({
+      onBoost: () => this.requestBoost(),
+      onFireDown: () => { this._fireBtn = true; },
+      onFireUp: () => { this._fireBtn = false; },
+    });
+    this.hud.mount();
+    this.screens = new Screens();
+    this.screens.mount();
+
+    // AI context with shared scratch (no per-frame allocation).
+    this.aiCtx = {
+      up: new THREE.Vector3(0, 1, 0),
+      tmpDir: new THREE.Vector3(),
+      tmpPerp: new THREE.Vector3(),
+      fireAt: (e) => this.combat.enemyFire(e),
+    };
+
+    // flight + run state
     this.speed = CONFIG.flight.cruiseSpeed;
     this.bank = 0;
     this.recoil = 0;
+    this.hitShake = 0;
+    this.wave = 0;
+    this.betweenWaves = false;
+    this.waveTimer = 0;
+    this._fireBtn = false;
 
     // scratch
-    this._qLook = new THREE.Quaternion();
     this._qRoll = new THREE.Quaternion();
     this._zAxis = new THREE.Vector3(0, 0, 1);
     this._xAxis = new THREE.Vector3(1, 0, 0);
@@ -54,13 +99,75 @@ export class Game {
   }
 
   async start() {
-    // Try AR camera background; pure-space fallback is fine if denied.
     await Input.requestGyroPermission();
     await this.arCamera.enable();
-
+    this._startRun();
     this.running = true;
     this.clock.start();
     this._loop();
+  }
+
+  _startRun() {
+    this.player.reset();
+    this.score.reset();
+    this.spawner.reset();
+    this.combat.reset();
+    this.screens.hide();
+    this.hud.setVisible(true);
+    this.state = 'playing';
+    this.wave = 0;
+    this.betweenWaves = false;
+    this._nextWave();
+  }
+
+  _nextWave() {
+    this.wave += 1;
+    this.spawner.startWave(this.wave);
+    if (this.spawner.isBossWave(this.wave)) {
+      this.hud.showBanner('⚠ ХОР ПРИБЛИЖАЕТСЯ');
+      this.audio.setMusic('boss');
+    } else {
+      this.hud.showBanner('ВОЛНА ' + this.wave);
+      this.audio.setMusic('combat');
+    }
+  }
+
+  requestBoost() {
+    if (this.state !== 'playing') return;
+    if (this.player.tryBoost()) {
+      this.audio.play('thruster');
+      vibrate(CONFIG.weaponFeel.haptics.boost);
+    }
+  }
+
+  _onPlayerHit() {
+    this.hud.flashDamage();
+    this.hitShake = Math.max(this.hitShake, CONFIG.weaponFeel.shakeOnHit);
+    if (!this.player.alive) this._gameOver();
+  }
+
+  _gameOver() {
+    if (this.state === 'over') return;
+    this.state = 'over';
+    this.audio.play('explosionBig');
+    vibrate(CONFIG.weaponFeel.haptics.explosion);
+    const newBest = this.score.commitBest();
+    this.hud.setVisible(false);
+    this.screens.show({
+      victory: false, score: this.score.score, best: this.score.best,
+      wave: this.wave, newBest, onRetry: () => this._startRun(),
+    });
+  }
+
+  _victory() {
+    if (this.state === 'over') return;
+    this.state = 'over';
+    const newBest = this.score.commitBest();
+    this.hud.setVisible(false);
+    this.screens.show({
+      victory: true, score: this.score.score, best: this.score.best,
+      wave: this.wave, newBest, onRetry: () => this._startRun(),
+    });
   }
 
   _resize() {
@@ -74,13 +181,52 @@ export class Game {
   _loop() {
     if (!this.running) return;
     requestAnimationFrame(() => this._loop());
-    const dt = Math.min(this.clock.getDelta(), 0.05); // clamp to avoid huge steps
+    const dt = Math.min(this.clock.getDelta(), 0.05);
+    const playing = this.state === 'playing';
 
     this.input.update();
 
-    // TEMP: hold-to-boost so the flight-feel is interactive before weapons exist.
-    // (Boost will get its own HUD button once combat lands.)
-    const boosting = this.input.firing || this.input.boosting;
+    if (playing) this._updateGameplay(dt);
+
+    this._updateFlightAndRender(dt, playing);
+  }
+
+  _updateGameplay(dt) {
+    // Fire (tap anywhere or hold FIRE button).
+    if ((this.input.firing || this._fireBtn) && this.player.canFire()) {
+      this.combat.playerFire(this.camera, this.spawner.enemies);
+    }
+
+    this.player.update(dt);
+    this.score.update(dt);
+
+    // Spawn + drive enemies.
+    this.spawner.update(dt);
+    for (const e of this.spawner.enemies) {
+      if (e.active) updateEnemyAI(e, this.aiCtx, dt);
+    }
+
+    this.combat.update(dt, this.spawner.enemies, this.camera);
+
+    // Wave progression.
+    if (!this.betweenWaves && this.spawner.isWaveCleared()) {
+      if (this.spawner.isBossWave(this.wave)) {
+        this._victory();
+      } else {
+        this.betweenWaves = true;
+        this.waveTimer = 2.2;
+        this.hud.showBanner('ВОЛНА ОЧИЩЕНА');
+      }
+    }
+    if (this.betweenWaves) {
+      this.waveTimer -= dt;
+      if (this.waveTimer <= 0) { this.betweenWaves = false; this._nextWave(); }
+    }
+  }
+
+  _updateFlightAndRender(dt, playing) {
+    // Speed eases toward boost or cruise.
+    const boosting = playing && this.player.boosting;
     const targetSpeed = boosting ? CONFIG.flight.boostSpeed : CONFIG.flight.cruiseSpeed;
     this.speed += (targetSpeed - this.speed) * Math.min(1, CONFIG.flight.speedLerp * dt);
     this.speedField.setSpeed(this.speed);
@@ -89,59 +235,56 @@ export class Game {
       (this.speed - CONFIG.flight.cruiseSpeed) /
         (CONFIG.flight.boostSpeed - CONFIG.flight.cruiseSpeed), 0, 1);
 
-    // FOV punch: widen field of view with speed for a visceral acceleration kick.
+    // FOV punch.
     const fov = CONFIG.render.fov + (CONFIG.render.fovBoost - CONFIG.render.fov) * t;
     if (Math.abs(fov - this.camera.fov) > 0.01) {
       this.camera.fov = fov;
       this.camera.updateProjectionMatrix();
     }
 
-    // --- Camera orientation = look (gyro/drag) + bank + recoil ---
-    this._qLook.copy(this.input.quaternion);
+    // Orientation = look (gyro/drag) + bank + recoil.
+    this.camera.quaternion.copy(this.input.quaternion);
 
-    // Banking: roll into turns, proportional to how fast we're yawing.
     const targetBank = THREE.MathUtils.clamp(
       -this.input.yawDelta * 40, -CONFIG.flight.bankAmount, CONFIG.flight.bankAmount);
     this.bank += (targetBank - this.bank) * Math.min(1, CONFIG.flight.bankLerp * dt);
     this._qRoll.setFromAxisAngle(this._zAxis, this.bank);
-    this._qLook.multiply(this._qRoll);
+    this.camera.quaternion.multiply(this._qRoll);
 
-    // Weapon recoil (decays each frame; weapons add to it later).
     this.recoil += (0 - this.recoil) * Math.min(1, CONFIG.weaponFeel.recoilReturn * dt);
     if (this.recoil > 0.0001) {
       this._qRoll.setFromAxisAngle(this._xAxis, this.recoil);
-      this._qLook.multiply(this._qRoll);
+      this.camera.quaternion.multiply(this._qRoll);
     }
 
-    this.camera.quaternion.copy(this._qLook);
-
-    // Boost micro-shake — a touch of G-force rumble at high speed.
-    const shake = CONFIG.flight.shakeOnBoost * t;
+    // Shake: boost rumble + decaying damage kick.
+    this.hitShake = Math.max(0, this.hitShake - dt * 2.2);
+    const shake = CONFIG.flight.shakeOnBoost * t + this.hitShake;
     if (shake > 0.001) {
       this.camera.position.set(
         (Math.random() - 0.5) * shake,
-        (Math.random() - 0.5) * shake,
-        0
-      );
+        (Math.random() - 0.5) * shake, 0);
     } else {
       this.camera.position.set(0, 0, 0);
     }
 
-    // World + audio.
+    // World + audio + HUD + render.
     this.starfield.update(dt);
     this.speedField.update(dt);
     if (this.audio) {
       this.audio.setEngine(t);
       this.audio.updateListener(this.camera);
     }
-
+    if (this.state !== 'over') {
+      this.hud.update(dt, {
+        player: this.player, score: this.score, wave: this.wave,
+        camera: this.camera, enemies: this.spawner.enemies,
+      });
+    }
     this.post.render();
   }
 
-  /** Called by the weapon system later to kick the camera on each shot. */
-  addRecoil(amount = CONFIG.weaponFeel.recoilKick) {
-    this.recoil += amount;
-  }
+  addRecoil(amount = CONFIG.weaponFeel.recoilKick) { this.recoil += amount; }
 
   stop() {
     this.running = false;
@@ -152,5 +295,11 @@ export class Game {
     if (this.renderer.domElement.parentNode) {
       this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
     }
+  }
+}
+
+function vibrate(pattern) {
+  if (typeof navigator !== 'undefined' && navigator.vibrate) {
+    try { navigator.vibrate(pattern); } catch { /* ignore */ }
   }
 }

@@ -69,6 +69,14 @@ export const CONFIG = {
     boostCooldown: 2.5,
     boostDuration: 0.9,
     iFramesOnBoost: 0.6,
+    hitRadius: 2.6,          // how close a bolt/enemy must get to hit the player
+  },
+
+  // Subtle aim assist so touch aiming feels good without being an auto-aim.
+  aim: {
+    assistCone: 0.14,        // radians: only assists targets near the crosshair
+    assistStrength: 0.45,    // 0..1 nudge of the shot toward the locked target
+    range: 130,
   },
 
   weaponFeel: {
@@ -82,6 +90,13 @@ export const CONFIG = {
       explosion: [0, 60, 40, 120],
       boost: 25,
     },
+  },
+
+  enemy: {
+    projectileSpeed: 130,
+    projectileDamage: 12,
+    contactDamage: 18,      // damage if an enemy collides with the player
+    despawnDistance: 140,   // recycle enemies that fly far past the player
   },
 
   difficulty: {

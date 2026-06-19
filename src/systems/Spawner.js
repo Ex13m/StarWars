@@ -91,6 +91,11 @@ export class Spawner {
     e.spawn(type, pos, this.difficultyMul);
   }
 
+  /** Boss summons reinforcements mid-fight (called on phase transitions). */
+  summonEscorts(n) {
+    for (let i = 0; i < n; i++) this._spawnOne(Math.random() < 0.5 ? 'scout' : 'interceptor');
+  }
+
   reset() {
     for (const e of this.enemies) if (e.active) e.kill();
     this.wave = 0;

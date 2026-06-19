@@ -2,6 +2,7 @@
 // Crystalline silicon look: dark metallic body, glowing core, angular wings.
 // Holds combat + AI state; movement/firing decisions live in systems/EnemyAI.js.
 import * as THREE from 'three';
+import { CONFIG } from '../config.js';
 
 // Per-type tuning. radius is used for hit detection. (Boss = the "Choir" node.)
 export const ENEMY_TYPES = {
@@ -65,6 +66,22 @@ export class EnemyFighter {
     const body = this.group.getObjectByName('body');
     if (body) body.material.emissiveIntensity = 1.6;
     return this.hp <= 0;
+  }
+
+  /** Boss phase from current HP: 1 (calm) → 2 (volley) → 3 (enraged). */
+  bossPhase() {
+    const f = this.hp / this.maxHp;
+    if (f > CONFIG.boss.phase2At) return 1;
+    if (f > CONFIG.boss.phase3At) return 2;
+    return 3;
+  }
+
+  /** Visual escalation when the boss enters a new phase. */
+  enrage(phase) {
+    this._setCore(CONFIG.boss.coreColor[phase - 1]);
+    this.group.scale.setScalar((ENEMY_TYPES.boss.scale) * (1 + (phase - 1) * 0.08));
+    const body = this.group.getObjectByName('body');
+    if (body) body.material.emissiveIntensity = 1.2;
   }
 
   kill() {

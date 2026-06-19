@@ -72,7 +72,9 @@ export class Game {
       tmpDir: new THREE.Vector3(),
       tmpPerp: new THREE.Vector3(),
       fireAt: (e) => this.combat.enemyFire(e),
+      fireSpread: (e, n, a) => this.combat.enemyFireSpread(e, n, a),
     };
+    this._bossPhase = 0;
 
     // flight + run state
     this.yaw = 0; this.pitch = 0;
@@ -112,6 +114,7 @@ export class Game {
     this.state = 'playing';
     this.wave = 0;
     this.betweenWaves = false;
+    this._bossPhase = 0;
     this._nextWave();
   }
 
@@ -147,6 +150,28 @@ export class Game {
   _findBoss() {
     for (const e of this.spawner.enemies) if (e.active && e.type === 'boss') return e;
     return null;
+  }
+
+  // Watch the boss's HP phase and react on each escalation: enrage visuals,
+  // summon escorts, banner + roar. Phase only ever rises (HP falls).
+  _updateBoss() {
+    const boss = this._findBoss();
+    if (!boss) { this._bossPhase = 0; return; }
+    const ph = boss.bossPhase();
+    if (ph > this._bossPhase) {
+      const prev = this._bossPhase;
+      this._bossPhase = ph;
+      if (prev > 0 && ph >= 2) this._onBossPhase(ph, boss); // skip the initial 0→1
+    }
+  }
+
+  _onBossPhase(ph, boss) {
+    boss.enrage(ph);
+    const escorts = CONFIG.boss.escortsByPhase[ph - 1];
+    if (escorts > 0) this.spawner.summonEscorts(escorts);
+    this.hud.showBanner(ph >= 3 ? '⚠ ХОР: ЯРОСТЬ' : 'ХОР: РАСКОЛ — ЗАЛП');
+    this.audio.play('explosionBig');
+    vibrate(CONFIG.weaponFeel.haptics.explosion);
   }
 
   _onPlayerHit() {
@@ -207,6 +232,7 @@ export class Game {
     this.spawner.update(dt);
     for (const e of this.spawner.enemies) if (e.active) updateEnemyAI(e, this.aiCtx, dt);
     this.combat.update(dt, this.spawner.enemies, this.camera);
+    this._updateBoss();
 
     if (!this.betweenWaves && this.spawner.isWaveCleared()) {
       if (this.spawner.isBossWave(this.wave)) {

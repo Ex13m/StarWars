@@ -56,6 +56,7 @@ export class HUD {
       radar: q(this.root, '[data-radar]'),
       crosshair: q(this.root, '[data-crosshair]'),
       bossWrap: q(this.root, '[data-boss-wrap]'),
+      bossName: q(this.root, '[data-boss-name]'),
       bossFill: q(this.root, '[data-boss-fill]'),
       speed: q(this.root, '[data-speed]'),
       boostBadge: q(this.root, '[data-boostbadge]'),
@@ -109,6 +110,7 @@ export class HUD {
 
     if (boss && boss.active) {
       this.el.bossWrap.hidden = false;
+      this.el.bossName.textContent = 'ХОР · ФАЗА ' + boss.bossPhase();
       this.el.bossFill.style.width = (100 * Math.max(0, boss.hp) / boss.maxHp) + '%';
     } else {
       this.el.bossWrap.hidden = true;

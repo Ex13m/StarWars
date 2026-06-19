@@ -23,6 +23,9 @@ export class CombatSystem {
     this._toE = new THREE.Vector3();
     this._dir = new THREE.Vector3();
     this._muzzle = new THREE.Vector3();
+    this._up = new THREE.Vector3(0, 1, 0);
+    this._sdir = new THREE.Vector3();
+    this._q = new THREE.Quaternion();
   }
 
   /**
@@ -61,6 +64,23 @@ export class CombatSystem {
     this._dir.copy(enemy.position).multiplyScalar(-1).normalize(); // toward origin
     const e = CONFIG.enemy;
     this.projectiles.spawn(enemy.position, this._dir, e.projectileSpeed, 'enemy', e.projectileDamage);
+    this.audio.play('laserEnemy', { pos: enemy.position });
+  }
+
+  /** Boss spread volley: `count` bolts fanned across `totalAngle` (radians). */
+  enemyFireSpread(enemy, count, totalAngle) {
+    this._dir.copy(enemy.position).multiplyScalar(-1).normalize(); // toward origin
+    const e = CONFIG.enemy;
+    if (count <= 1) {
+      this.projectiles.spawn(enemy.position, this._dir, e.projectileSpeed, 'enemy', e.projectileDamage);
+    } else {
+      for (let i = 0; i < count; i++) {
+        const a = -totalAngle / 2 + totalAngle * (i / (count - 1));
+        this._q.setFromAxisAngle(this._up, a);
+        this._sdir.copy(this._dir).applyQuaternion(this._q);
+        this.projectiles.spawn(enemy.position, this._sdir, e.projectileSpeed, 'enemy', e.projectileDamage);
+      }
+    }
     this.audio.play('laserEnemy', { pos: enemy.position });
   }
 

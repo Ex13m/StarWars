@@ -113,4 +113,16 @@ export const CONFIG = {
     bossEveryWaves: 4,
     enemySpeedGrowth: 0.06,  // +6% enemy speed per wave
   },
+
+  // Boss ("Choir") phases — escalate as its HP drops. Index by phase-1 (0,1,2).
+  boss: {
+    phase2At: 0.66,          // HP fraction entering phase 2
+    phase3At: 0.33,          // HP fraction entering phase 3 (enraged)
+    speedMul: [1.0, 1.45, 2.0],   // strafe speed multiplier per phase
+    fireMul: [1.0, 1.7, 2.6],     // fire-rate multiplier per phase
+    spreadByPhase: [1, 3, 5],     // bolts per volley per phase
+    spreadAngle: 0.5,        // total fan width of a spread volley (rad)
+    escortsByPhase: [0, 3, 4],    // escorts summoned on entering each phase
+    coreColor: [0xff7849, 0xffae3d, 0xff2a2a], // hotter as it rages
+  },
 };

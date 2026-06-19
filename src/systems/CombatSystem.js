@@ -26,6 +26,7 @@ export class CombatSystem {
     this._up = new THREE.Vector3(0, 1, 0);
     this._sdir = new THREE.Vector3();
     this._q = new THREE.Quaternion();
+    this._hitDir = new THREE.Vector3();
   }
 
   /**
@@ -61,6 +62,7 @@ export class CombatSystem {
 
   /** Enemy fires a bolt straight at the player (origin). Called by EnemyAI. */
   enemyFire(enemy) {
+    enemy.markFire();
     this._dir.copy(enemy.position).multiplyScalar(-1).normalize(); // toward origin
     const e = CONFIG.enemy;
     this.projectiles.spawn(enemy.position, this._dir, e.projectileSpeed, 'enemy', e.projectileDamage);
@@ -69,6 +71,7 @@ export class CombatSystem {
 
   /** Boss spread volley: `count` bolts fanned across `totalAngle` (radians). */
   enemyFireSpread(enemy, count, totalAngle) {
+    enemy.markFire();
     this._dir.copy(enemy.position).multiplyScalar(-1).normalize(); // toward origin
     const e = CONFIG.enemy;
     if (count <= 1) {
@@ -110,8 +113,9 @@ export class CombatSystem {
         // enemy bolt vs player at the origin
         if (p.mesh.position.lengthSq() < pr2) {
           const applied = this.player.takeDamage(p.damage);
+          this._hitDir.copy(p.vel).multiplyScalar(-1).normalize(); // back toward the shooter
           this.projectiles.kill(p);
-          if (applied) this._onPlayerHit(false);
+          if (applied) this._onPlayerHit(false, this._hitDir);
         }
       }
     }
@@ -124,9 +128,10 @@ export class CombatSystem {
       const cr = e.radius + CONFIG.player.hitRadius;
       if (d2 < cr * cr) {
         const applied = this.player.takeDamage(CONFIG.enemy.contactDamage);
+        this._hitDir.copy(e.position).normalize(); // toward the rammer
         this._explode(e, 0xff8a5c);
         e.kill();
-        if (applied) this._onPlayerHit(true);
+        if (applied) this._onPlayerHit(true, this._hitDir);
       } else if (d2 > despawn2) {
         e.kill(); // flew past — no penalty, no points
       }
@@ -146,11 +151,11 @@ export class CombatSystem {
     this.audio.play(big ? 'explosionBig' : 'explosion', { pos: e.position });
   }
 
-  _onPlayerHit(contact) {
+  _onPlayerHit(contact, dir) {
     this.score.registerPlayerHit();
     this.audio.play(this.player.shield > 0 ? 'shield' : 'impact');
     vibrate(CONFIG.weaponFeel.haptics.hit);
-    if (this.hooks.onPlayerHit) this.hooks.onPlayerHit(contact);
+    if (this.hooks.onPlayerHit) this.hooks.onPlayerHit(contact, dir);
   }
 
   reset() {

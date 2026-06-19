@@ -29,6 +29,7 @@ export class EnemyFighter {
     this.points = 0;
     this.state = 'approach';
     this.stateTime = 0;
+    this.fireFlash = 0;   // brief core-pulse when this enemy shoots (telegraph)
     this.vel = new THREE.Vector3();
   }
 
@@ -59,6 +60,9 @@ export class EnemyFighter {
     const core = this.group.getObjectByName('core');
     if (core) core.material.color.setHex(hex);
   }
+
+  /** Telegraph: flash the core so the player sees WHICH enemy just fired. */
+  markFire() { this.fireFlash = 0.18; }
 
   damage(amount) {
     this.hp -= amount;
@@ -96,6 +100,12 @@ export class EnemyFighter {
     const body = this.group.getObjectByName('body');
     if (body && body.material.emissiveIntensity > 0.5) {
       body.material.emissiveIntensity = Math.max(0.5, body.material.emissiveIntensity - dt * 4);
+    }
+    // Fire telegraph: pop the core big+bright, then settle back.
+    const core = this.group.getObjectByName('core');
+    if (core) {
+      if (this.fireFlash > 0) this.fireFlash = Math.max(0, this.fireFlash - dt);
+      core.scale.setScalar(1 + this.fireFlash * 10);
     }
   }
 }

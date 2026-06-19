@@ -60,7 +60,7 @@ export class Game {
     this.spawner = new Spawner(this.scene);
     this.combat = new CombatSystem(this.scene, {
       player: this.player, score: this.score, audio: this.audio,
-      hooks: { onRecoil: () => this.addRecoil(), onPlayerHit: () => this._onPlayerHit() },
+      hooks: { onRecoil: () => this.addRecoil(), onPlayerHit: (c, dir) => this._onPlayerHit(c, dir) },
     });
 
     this.hud = new HUD(); this.hud.mount();
@@ -89,6 +89,8 @@ export class Game {
     this._xAxis = new THREE.Vector3(1, 0, 0);
     this._fwd = new THREE.Vector3();
     this._tip = new THREE.Vector3();
+    this._right = new THREE.Vector3();
+    this._up = new THREE.Vector3();
 
     this.clock = new THREE.Clock();
     this._onResize = () => this._resize();
@@ -140,7 +142,7 @@ export class Game {
       this.combat.spawnPlayerBolt(this._tip, this._fwd);
       this.cockpit.fire(i);
     }
-    this.audio.play('laserPlayer', { pos: this.camera.position });
+    this.audio.play('laserPlayer'); // your own gun: centered, full volume
     this.addRecoil();
     vibrate(CONFIG.weaponFeel.haptics.fire);
   }
@@ -174,8 +176,14 @@ export class Game {
     vibrate(CONFIG.weaponFeel.haptics.explosion);
   }
 
-  _onPlayerHit() {
+  _onPlayerHit(contact, dir) {
     this.hud.flashDamage();
+    // Point a red arc at where the shot came from, so the threat is unmistakable.
+    if (dir) {
+      this._right.set(1, 0, 0).applyQuaternion(this.camera.quaternion);
+      this._up.set(0, 1, 0).applyQuaternion(this.camera.quaternion);
+      this.hud.showIncoming(Math.atan2(dir.dot(this._right), dir.dot(this._up)));
+    }
     this.hitShake = Math.max(this.hitShake, CONFIG.weaponFeel.shakeOnHit);
     if (!this.player.alive) this._gameOver();
   }

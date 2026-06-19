@@ -108,8 +108,8 @@ export class Armada {
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     this.swarmGeo = geo;
     const mat = new THREE.PointsMaterial({
-      size: 2.2, sizeAttenuation: true, vertexColors: true,
-      transparent: true, opacity: 0.95, depthWrite: false,
+      size: 1.4, sizeAttenuation: true, vertexColors: true,
+      transparent: true, opacity: 0.5, depthWrite: false,
       blending: THREE.AdditiveBlending, fog: false,
     });
     this.swarm = new THREE.Points(geo, mat);
@@ -120,7 +120,8 @@ export class Armada {
   _respawnFighter(i, spread) {
     const c = this.cfg;
     const ang = Math.random() * Math.PI * 2;
-    const rad = (0.1 + Math.random() * 0.9) * c.swarmRadius;
+    const minF = c.swarmMinRadiusFrac;
+    const rad = (minF + Math.random() * (1 - minF)) * c.swarmRadius;
     this.swarmPos[i * 3] = Math.cos(ang) * rad;
     this.swarmPos[i * 3 + 1] = Math.sin(ang) * rad * 0.7;
     this.swarmPos[i * 3 + 2] = spread ? -Math.random() * c.corridorDepth : -c.corridorDepth;
@@ -132,14 +133,15 @@ export class Armada {
 
   // --- tracer streaks (far-off weapons fire) ---
   _buildTracers() {
-    this.tracerCount = 40;
+    this.tracerCount = 16;
     this.tracerPos = new Float32Array(this.tracerCount * 2 * 3);
     this.tracerLife = new Float32Array(this.tracerCount);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(this.tracerPos, 3));
     this.tracerGeo = geo;
+    // Cool, faint streaks so distant fire never gets mistaken for incoming bolts.
     const mat = new THREE.LineBasicMaterial({
-      color: 0xffe08a, transparent: true, opacity: 0.8,
+      color: 0x8fb4ff, transparent: true, opacity: 0.3,
       blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
     });
     this.tracers = new THREE.LineSegments(geo, mat);
@@ -211,7 +213,7 @@ export class Armada {
     this.swarmGeo.attributes.position.needsUpdate = true;
 
     // tracers: occasionally spawn, always fade + scroll with the flow
-    if (Math.random() < dt * 60) this._spawnTracer();
+    if (Math.random() < dt * 22) this._spawnTracer();
     for (let i = 0; i < this.tracerCount; i++) {
       if (this.tracerLife[i] <= 0) continue;
       this.tracerLife[i] -= dt;

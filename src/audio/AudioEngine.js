@@ -43,6 +43,10 @@ export class AudioEngine {
     this.currentMusic = null;
     this.engine = null;   // looping engine hum Howl
     this.unlocked = false;
+
+    // Listener basis for predictable stereo panning (set each frame from camera).
+    this._lpos = { x: 0, y: 0, z: 0 };
+    this._rx = 1; this._ry = 0; this._rz = 0; // camera right (local X) in world
   }
 
   // Build all Howls. Cheap: Howler streams/decodes lazily on first play.
@@ -94,10 +98,22 @@ export class AudioEngine {
 
     const howl = takes[i];
     const id = howl.play();
-    if (opts.volume != null) howl.volume(opts.volume, id);
     // Slight pitch variation adds life to repeated SFX.
     howl.rate(opts.rate != null ? opts.rate : 0.94 + Math.random() * 0.12, id);
-    if (opts.pos) howl.pos(opts.pos.x, opts.pos.y, opts.pos.z, id);
+
+    if (opts.pos) {
+      // Gentle, predictable stereo pan + distance falloff (no disorienting HRTF).
+      const dx = opts.pos.x - this._lpos.x;
+      const dy = opts.pos.y - this._lpos.y;
+      const dz = opts.pos.z - this._lpos.z;
+      const dist = Math.hypot(dx, dy, dz) || 1;
+      const pan = Math.max(-1, Math.min(1, (dx * this._rx + dy * this._ry + dz * this._rz) / dist));
+      const base = opts.volume != null ? opts.volume : CONFIG.audio.sfxVolume;
+      howl.stereo(pan * 0.65, id);
+      howl.volume(base * Math.max(0.18, 1 - dist / 260), id); // stays audible at range
+    } else if (opts.volume != null) {
+      howl.volume(opts.volume, id);
+    }
     return id;
   }
 
@@ -127,14 +143,13 @@ export class AudioEngine {
     this.engine.rate(0.8 + 0.7 * speed01);
   }
 
-  /** Keep the spatial listener in sync with the camera each frame. */
+  /** Store listener position + right vector for stereo panning (each frame). */
   updateListener(camera) {
-    if (!this.ok || !window.Howler || !window.Howler.pos) return;
+    if (!this.ok) return;
     const p = camera.position;
-    window.Howler.pos(p.x, p.y, p.z);
-    // forward + up vectors from the camera's world matrix.
-    const e = camera.matrixWorld.elements;
-    window.Howler.orientation(-e[8], -e[9], -e[10], e[4], e[5], e[6]);
+    this._lpos.x = p.x; this._lpos.y = p.y; this._lpos.z = p.z;
+    const e = camera.matrixWorld.elements; // first column = camera right (local X)
+    this._rx = e[0]; this._ry = e[1]; this._rz = e[2];
   }
 
   stopAll() {

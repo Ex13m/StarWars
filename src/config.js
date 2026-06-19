@@ -49,12 +49,14 @@ export const CONFIG = {
   },
 
   // Large-scale battle backdrop you fly through (capital ships, distant dogfights).
+  // Kept dim and to the PERIPHERY so it reads as a backdrop, never as live threats.
   armada: {
     capitalShips: 7,         // huge ships drifting in the corridor
-    fighterSwarm: 260,       // distant dogfighting specks
-    swarmRadius: 320,
+    fighterSwarm: 150,       // distant dogfighting specks
+    swarmRadius: 340,
+    swarmMinRadiusFrac: 0.5, // keep the swarm out of the central play cone
     corridorDepth: 1100,
-    flakInterval: 0.6,       // avg seconds between distant explosions
+    flakInterval: 0.7,       // avg seconds between distant explosions
   },
 
   audio: {

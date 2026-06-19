@@ -3,8 +3,8 @@
 // material + bloom makes them streak and glow.
 import * as THREE from 'three';
 
-const PLAYER_COLOR = 0x77ffd6;
-const ENEMY_COLOR = 0xff4d6d;
+const PLAYER_COLOR = 0x77ffd6;  // cool cyan-green
+const ENEMY_COLOR = 0xff5a2a;   // hot orange-red — pops against the cool backdrop
 const LIFETIME = 2.4;
 
 export class ProjectilePool {
@@ -51,6 +51,9 @@ export class ProjectilePool {
     p.mesh.position.copy(pos);
     p.mesh.quaternion.setFromUnitVectors(this._fwd, this._dir);
     p.mesh.material.color.setHex(team === 'player' ? PLAYER_COLOR : ENEMY_COLOR);
+    // Enemy bolts are fatter so incoming fire is unmistakable.
+    if (team === 'player') p.mesh.scale.set(1, 1, 1);
+    else p.mesh.scale.set(2.6, 2.6, 1.5);
     p.mesh.visible = true;
     return p;
   }

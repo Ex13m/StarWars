@@ -15,6 +15,7 @@ export class HUD {
     this.root.className = 'hud';
     this.root.innerHTML = `
       <div class="hud-damage" data-damage></div>
+      <div class="hud-incoming" data-incoming></div>
       <div class="hud-warp" data-warp></div>
       <div class="hud-markers" data-markers></div>
       <div class="hud-top">
@@ -52,6 +53,7 @@ export class HUD {
       hull: q(this.root, '[data-hull]'),
       banner: q(this.root, '[data-banner]'),
       damage: q(this.root, '[data-damage]'),
+      incoming: q(this.root, '[data-incoming]'),
       warp: q(this.root, '[data-warp]'),
       radar: q(this.root, '[data-radar]'),
       crosshair: q(this.root, '[data-crosshair]'),
@@ -91,6 +93,12 @@ export class HUD {
 
   flashDamage() { retrigger(this.el.damage, 'is-flash'); }
   flashWarp() { retrigger(this.el.warp, 'is-flash'); }
+
+  /** Red arc pointing toward incoming fire. angle: 0 = top, +PI/2 = right. */
+  showIncoming(angle) {
+    this.el.incoming.style.transform = `translate(-50%, -50%) rotate(${angle}rad)`;
+    retrigger(this.el.incoming, 'is-flash');
+  }
 
   update(dt, state) {
     const { player, score, wave, camera, enemies, boss, speed, throttleT } = state;
